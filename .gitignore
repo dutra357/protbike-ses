@@ -1,0 +1,188 @@
+# =========================
+# OS / Editor junk
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+*.bak
+
+# =========================
+# IDEs
+# =========================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse / JBoss Tools
+.project
+.classpath
+.settings/
+.factorypath
+.recommenders/
+.apt_generated/
+.sts4-cache/
+
+# VS Code
+.vscode/
+.history/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# =========================
+# Java / Build outputs
+# =========================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporary compilation files
+hs_err_pid*
+replay_pid*
+
+# =========================
+# Maven
+# =========================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Optional: keep wrapper JARs tracked (recommended)
+!.mvn/wrapper/maven-wrapper.jar
+
+# =========================
+# Gradle
+# =========================
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# =========================
+# Quarkus
+# =========================
+# Quarkus dev / generated stuff
+.quarkus/
+quarkus.log
+
+# If you use Quarkus CLI cache locally (varies)
+.quarkus-dev/
+.quarkus-cache/
+
+# =========================
+# Test / Coverage
+# =========================
+# JaCoCo
+jacoco.exec
+jacoco*.exec
+**/jacoco*.exec
+**/target/site/jacoco/
+**/build/reports/jacoco/
+
+# Surefire/Failsafe dumps
+**/surefire-reports/
+**/failsafe-reports/
+
+# Coverage / reports
+coverage/
+**/build/reports/
+**/target/site/
+
+# =========================
+# AWS / Lambda / Local emulation
+# =========================
+# AWS SAM / CDK / local artifacts
+.aws-sam/
+cdk.out/
+.sam/
+serverless/
+.localstack/
+localstack/
+.dynamodb/
+*.zip
+
+# AWS credentials must never be committed
+.aws/
+!/.aws/README.md
+
+# =========================
+# Env / Secrets
+# =========================
+.env
+.env.*
+*.env
+*.secret
+*.secrets
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# =========================
+# Docker / Compose overrides
+# =========================
+docker-compose.override.yml
+docker-compose.*.yml
+
+# =========================
+# Misc
+# =========================
+# Generated docs / diagrams (uncomment if needed)
+# docs/generated/
+# diagrams/out/
+
+# Node (se você tiver front junto)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+.cache/
+.parcel-cache/
+
+# Terraform (se usar infra como código)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+terraform.rc
+.terraformrc
