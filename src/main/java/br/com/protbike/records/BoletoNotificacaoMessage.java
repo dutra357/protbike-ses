@@ -1,0 +1,106 @@
+package br.com.protbike.records;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.time.Instant;
+import java.util.List;
+
+public record BoletoNotificacaoMessage(
+
+        @JsonProperty("tenant_id")
+        String tenantId,
+
+        @JsonProperty("processamento_id")
+        String processamentoId,
+
+        @JsonProperty("protocolo")
+        String numeroProtocolo,
+
+        @JsonProperty("origem_csv")
+        String origemCsv,
+
+        @JsonProperty("tipo_evento")
+        String tipoEvento,
+
+        @JsonProperty("canais")
+        List<String> canais,
+
+        @JsonProperty("destinatario")
+        Destinatario destinatario,
+
+        @JsonProperty("boleto")
+        Boleto boleto,
+
+        @JsonProperty("meta")
+        Meta meta
+
+) {
+
+        public record Destinatario(
+
+                @JsonProperty("nome")
+                String nome,
+
+                @JsonProperty("cpf")
+                String cpf,
+
+                @JsonProperty("telefone_whatsapp")
+                String telefoneWhatsapp,
+
+                @JsonProperty("email")
+                String email
+
+        ) {}
+
+        public record Boleto(
+
+                @JsonProperty("nosso_numero")
+                Integer nossoNumero,
+
+                @JsonProperty("mes_referente")
+                String mesReferente,
+
+                @JsonProperty("data_vencimento")
+                String dataVencimento,
+
+                @JsonProperty("data_emissao")
+                String dataEmissao,
+
+                @JsonProperty("linha_digitavel")
+                String linhaDigitavel,
+
+                @JsonProperty("linha_digitavel_atual")
+                String linhaDigitavelAtual,
+
+                @JsonProperty("valor_boleto")
+                String valorBoleto,
+
+                @JsonProperty("descricao_situacao_boleto")
+                String descricaoSituacaoBoleto,
+
+                @JsonProperty("link_boleto")
+                String linkBoleto,
+
+                @JsonProperty("pix")
+                Pix pix
+
+        ) {}
+
+        public record Pix(
+                @JsonProperty("copia_cola")
+                String copiaCola
+        ) {}
+
+        public record Meta(
+
+                @JsonProperty("criado_em")
+                Instant criadoEm,
+
+                @JsonProperty("origem_sistema")
+                String origemSistema,
+
+                @JsonProperty("adm_email")
+                String admEmail
+
+        ) {}
+}
