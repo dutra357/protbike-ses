@@ -24,22 +24,22 @@ public class NotificationProcessor {
                 .collect(Collectors.toMap(NotificationStrategy::getChannelName, Function.identity()));
     }
 
-    public void processMessage(BoletoNotificacaoMessage msg) {
+    public void processMessage(BoletoNotificacaoMessage boletoMessage) {
 
-        if (msg.canais() == null || msg.canais().isEmpty()) {
-            LOG.warn("Mensagem sem canais definidos: " + msg.processamentoId());
+        if (boletoMessage.canais() == null || boletoMessage.canais().isEmpty()) {
+            LOG.warn("Mensagem sem canais definidos: " + boletoMessage.processamentoId());
             return;
         }
 
-        for (String canal : msg.canais()) {
+        for (String canal : boletoMessage.canais()) {
             // Normaliza a string de canais
             String key = canal.toLowerCase().trim();
 
             if (strategies.containsKey(key)) {
                 try {
-                    strategies.get(key).send(msg);
+                    strategies.get(key).send(boletoMessage);
                 } catch (Exception e) {
-                    LOG.errorf(e, "Erro ao enviar %s para protocolo %s", key, msg.numeroProtocolo());
+                    LOG.errorf(e, "Erro ao enviar %s para protocolo %s", key, boletoMessage.numeroProtocolo());
                     // Aqui você pode decidir se lança erro para reprocessar a fila ou apenas loga
                 }
             } else {

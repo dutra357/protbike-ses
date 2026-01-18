@@ -37,7 +37,6 @@ public record BoletoNotificacaoMessage(
         Meta meta
 
 ) {
-
         @RegisterForReflection
         public record Destinatario(
 

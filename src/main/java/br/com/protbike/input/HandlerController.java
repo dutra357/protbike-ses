@@ -40,8 +40,8 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
 
                     LOG.infof("Processando lista interna de %d boletos", wrapper.boletos().size());
 
-                    for (BoletoNotificacaoMessage domainMessage : wrapper.boletos()) {
-                        notificationProcessor.processMessage(domainMessage);
+                    for (BoletoNotificacaoMessage boletoNotificacaoMessage : wrapper.boletos()) {
+                        notificationProcessor.processMessage(boletoNotificacaoMessage);
                     }
                 } else {
                     LOG.warn("Mensagem recebida com lista de boletos vazia ou nula.");
