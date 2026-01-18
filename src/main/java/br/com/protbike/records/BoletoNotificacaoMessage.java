@@ -1,10 +1,12 @@
 package br.com.protbike.records;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import java.time.Instant;
 import java.util.List;
 
+@RegisterForReflection
 public record BoletoNotificacaoMessage(
 
         @JsonProperty("tenant_id")
@@ -36,6 +38,7 @@ public record BoletoNotificacaoMessage(
 
 ) {
 
+        @RegisterForReflection
         public record Destinatario(
 
                 @JsonProperty("nome")
@@ -52,6 +55,7 @@ public record BoletoNotificacaoMessage(
 
         ) {}
 
+        @RegisterForReflection
         public record Boleto(
 
                 @JsonProperty("nosso_numero")
@@ -86,11 +90,13 @@ public record BoletoNotificacaoMessage(
 
         ) {}
 
+        @RegisterForReflection
         public record Pix(
                 @JsonProperty("copia_cola")
                 String copiaCola
         ) {}
 
+        @RegisterForReflection
         public record Meta(
 
                 @JsonProperty("criado_em")
