@@ -25,13 +25,14 @@ public class NotificationProcessor {
     }
 
     public void processMessage(BoletoNotificacaoMessage msg) {
+
         if (msg.canais() == null || msg.canais().isEmpty()) {
             LOG.warn("Mensagem sem canais definidos: " + msg.processamentoId());
             return;
         }
 
         for (String canal : msg.canais()) {
-            // Normaliza a string (lowercase, trim) para evitar erros
+            // Normaliza a string de canais
             String key = canal.toLowerCase().trim();
 
             if (strategies.containsKey(key)) {

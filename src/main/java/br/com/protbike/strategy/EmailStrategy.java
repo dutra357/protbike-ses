@@ -4,6 +4,7 @@ import br.com.protbike.records.BoletoNotificacaoMessage;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 import software.amazon.awssdk.services.ses.SesClient;
+import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 
 @ApplicationScoped
 public class EmailStrategy implements NotificationStrategy {
@@ -28,14 +29,13 @@ public class EmailStrategy implements NotificationStrategy {
 
         // Exemplo simplificado de chamada ao SES
         // Na prática, você montaria o HTML baseado no objeto Boleto
-        /*
 
         sesClient.sendEmail(SendEmailRequest.builder()
-                .source("nao-responda@protbike.com.br")
+                .source("contato@protbike.com.br")
                 .destination(d -> d.toAddresses(message.destinatario().email()))
                 .message(m -> m.subject(s -> s.data("Seu Boleto Chegou"))
                                .body(b -> b.text(t -> t.data("Link: " + message.boleto().linkBoleto()))))
                 .build());
-        */
+
     }
 }
