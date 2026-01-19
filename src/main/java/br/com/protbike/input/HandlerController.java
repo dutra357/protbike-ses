@@ -38,14 +38,16 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
                 // Validação
                 if (wrapper.boletos() != null && !wrapper.boletos().isEmpty()) {
 
-                    LOG.infof("Processando lista interna de %d boletos", wrapper.boletos().size());
+                    LOG.infof("Processando lista de %d boleto(s). ContextoLambda={}",
+                            wrapper.boletos().size(), context.getAwsRequestId());
 
                     for (BoletoNotificacaoMessage boletoNotificacaoMessage : wrapper.boletos()) {
                         processador.processarEntrega(boletoNotificacaoMessage);
                     }
 
                 } else {
-                    LOG.warn("Mensagem com lista de boletos vazia ou nula. Ausente parse JSON.");
+                    LOG.warnf("Mensagem com lista de boletos vazia ou nula. Ausente parse JSON. ContextoLambda={}",
+                            context.getAwsRequestId());
                 }
 
             } catch (Exception e) {

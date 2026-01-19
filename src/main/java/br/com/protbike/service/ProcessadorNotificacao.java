@@ -42,7 +42,8 @@ public class ProcessadorNotificacao {
             NotificacaoStrategy strategy = strategies.get(canal);
 
             if (strategy == null) {
-                LOG.warnf("Estratégia não encontrada para o canal: %s, Protocolo: %s : ", canal, boletoMessage.numeroProtocolo());
+                LOG.warnf("Estratégia não encontrada para o canal: %s, Protocolo: %s : ",
+                        canal, boletoMessage.numeroProtocolo());
                 continue;
             }
 

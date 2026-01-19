@@ -67,22 +67,22 @@ public class EmailFormatterHTML {
                 // header
                 .append("<tr><td style=\"padding:20px 24px;border-bottom:1px solid #EAECF0;\">")
                 .append("<div style=\"font-size:18px;font-weight:700;\">ProtBike</div>")
-                .append("<div style=\"font-size:13px;color:#667085;margin-top:4px;\">Mensagem transacional — atualização de boleto</div>")
+                .append("<div style=\"font-size:13px;color:#667085;margin-top:4px;\">E-mail transacional — remessa de boleto</div>")
                 .append("</td></tr>")
 
                 // body intro
                 .append("<tr><td style=\"padding:20px 24px;\">")
                 .append("<p style=\"margin:0 0 12px 0;font-size:14px;line-height:20px;\">")
-                .append("Olá, ").append(esc(nome.isBlank() ? "cliente" : nome)).append(".")
+                .append("Olá, ").append(esc(nome.isBlank() ? "Associado(a)" : nome)).append(".")
                 .append("</p>")
                 .append("<p style=\"margin:0 0 16px 0;font-size:14px;line-height:20px;color:#344054;\">")
-                .append("Segue uma atualização sobre o seu boleto. Guarde o protocolo para suporte.")
+                .append("Segue o boleto atualizado para o mês. Sempre confira o recebedor.")
                 .append("</p>")
 
                 // summary box
                 .append("<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border:1px solid #EAECF0;border-radius:10px;overflow:hidden;\">")
                 .append("<tr><td style=\"padding:14px 14px;background:#FCFCFD;border-bottom:1px solid #EAECF0;\">")
-                .append("<span style=\"font-size:14px;font-weight:700;\">Resumo</span>")
+                .append("<span style=\"font-size:14px;font-weight:700;\">Situação</span>")
                 .append("<span style=\"display:inline-block;margin-left:10px;padding:4px 8px;border-radius:999px;background:")
                 .append(statusBadgeBg).append(";color:").append(statusBadgeFg).append(";font-size:12px;font-weight:700;\">")
                 .append(esc(status.isBlank() ? "N/D" : status))
@@ -105,7 +105,7 @@ public class EmailFormatterHTML {
                     .append("<a href=\"").append(escAttr(link)).append("\" ")
                     .append("style=\"display:inline-block;background:#1D4ED8;color:#FFFFFF;text-decoration:none;")
                     .append("padding:10px 14px;border-radius:10px;font-size:14px;font-weight:700;\">")
-                    .append("Acessar boleto</a>")
+                    .append("Boleto em PDF</a>")
                     .append("</div>");
         }
 
@@ -135,10 +135,10 @@ public class EmailFormatterHTML {
         // observações
         html.append("<div style=\"margin-top:20px;padding-top:16px;border-top:1px solid #EAECF0;\">")
                 .append("<p style=\"margin:0 0 8px 0;font-size:12px;line-height:18px;color:#667085;\">")
-                .append("Esta é uma mensagem automática, de natureza transacional.")
+                .append("Esta é uma mensagem automática, e não precisa ser respondida.")
                 .append("</p>")
                 .append("<p style=\"margin:0;font-size:12px;line-height:18px;color:#667085;\">")
-                .append("Em caso de divergência, responda este e-mail informando o protocolo <strong>")
+                .append("Para qualquer divergência, responda a este e-mail informando o protocolo <strong>")
                 .append(esc(protocolo)).append("</strong>.")
                 .append("</p>")
                 .append("</div>")
@@ -146,7 +146,8 @@ public class EmailFormatterHTML {
                 // assinatura
                 .append("<div style=\"margin-top:16px;font-size:14px;line-height:20px;\">")
                 .append("<div style=\"font-weight:700;\">Atenciosamente,</div>")
-                .append("<div>Equipe ProtBike</div>");
+                .append("<div>Equipe ")
+                .append(esc(msg.meta().associacaoApelido())).append("</div>");
 
         if (!contato.isBlank()) {
             html.append("<div style=\"margin-top:6px;font-size:13px;color:#344054;\">")
@@ -179,8 +180,7 @@ public class EmailFormatterHTML {
         return html.toString();
     }
 
-    // ---------- helpers ----------
-
+    // Auxiliares
     private static String row(String label, String value) {
         return "<tr>" +
                 "<td style=\"padding:10px 14px;border-top:1px solid #EAECF0;font-size:13px;color:#667085;width:40%;\">" +
@@ -222,7 +222,7 @@ public class EmailFormatterHTML {
         }
     }
 
-    // Escape básico pra conteúdo HTML (texto)
+    // Escape pra conteúdo HTML (texto)
     private static String esc(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;")

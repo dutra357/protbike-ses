@@ -29,7 +29,7 @@ public class EmailStrategy implements NotificacaoStrategy {
     @Override
     public void enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
-        LOG.infof("Enviando Email para %s via SES", notificacaoMsg.destinatario().email());
+        LOG.debugf("Enviando Email para %s via SES", notificacaoMsg.destinatario().email());
 
           SendEmailRequest request = SendEmailRequest.builder()
                 .fromEmailAddress(notificacaoMsg.meta().associacaoApelido() + " <" + notificacaoMsg.meta().admEmail() + ">")
@@ -43,13 +43,14 @@ public class EmailStrategy implements NotificacaoStrategy {
                 .build();
 
         SendEmailResponse response = sesClient.sendEmail(request);
-        LOG.infof("Email enviado via SES. messageId=%s", response.messageId());
+
+        LOG.debugf("Email enviado via SES. messageId=%s", response.messageId());
     }
 
 
     private Message messageToHtml(BoletoNotificacaoMessage msg) {
 
-        String subject = "PROTBIKE | Boleto disponível - " + msg.boleto().mesReferente();
+        String subject = msg.meta().associacaoApelido().toUpperCase() + " | Boleto disponível - " + msg.boleto().mesReferente();
         String htmlBody = EmailFormatterHTML.toHtml(msg);
         String textBody = BoletoEmailFormatter.formatarCorpoEmail(msg);
 
