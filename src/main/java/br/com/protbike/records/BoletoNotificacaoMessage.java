@@ -1,11 +1,12 @@
 package br.com.protbike.records;
 
+import br.com.protbike.exceptions.CampoEntradaInvalidoException;
 import br.com.protbike.records.enuns.CanalEntrega;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
-
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 
 @RegisterForReflection
@@ -23,27 +24,40 @@ public record BoletoNotificacaoMessage(
         @JsonProperty("origem_csv")
         String origemCsv,
 
-        // Tipo do evento (ex: BOLETO_FECHAMENTO)
         @JsonProperty("tipo_evento")
         String tipoEvento,
 
-        // Set de canais de entrega (ex: ["WHATSAPP"])
         @JsonProperty("canais")
         Set<CanalEntrega> canais,
 
-        // Para quem será enviada a mensagem
         @JsonProperty("destinatario")
         Destinatario destinatario,
 
-        // Dados estruturados do boleto
         @JsonProperty("boleto")
         Boleto boleto,
 
-        // Metadados para auditoria e rastreabilidade
         @JsonProperty("meta")
         Meta meta
 
 ) {
+        public BoletoNotificacaoMessage {
+                requireNotBlank(tenantId, "tenant_id");
+                requireNotBlank(processamentoId, "processamento_id");
+                requireNotBlank(numeroProtocolo, "protocolo");
+                requireNotBlank(origemCsv, "origem_csv");
+                requireNotBlank(tipoEvento, "tipo_evento");
+
+                requireNotNullAndNotEmpty(canais, "canais");
+                // evita null dentro do set (se vier [null] no JSON)
+                if (canais.stream().anyMatch(Objects::isNull)) {
+                        throw new IllegalArgumentException("canais contém valor nulo");
+                }
+
+                requireNotNull(destinatario, "destinatario");
+                requireNotNull(boleto, "boleto");
+                requireNotNull(meta, "meta");
+        }
+
         @RegisterForReflection
         public record Destinatario(
 
@@ -59,7 +73,16 @@ public record BoletoNotificacaoMessage(
                 @JsonProperty("email")
                 String email
 
-        ) {}
+        ) {
+                public Destinatario {
+                        requireNotBlank(nome, "destinatario.nome");
+
+                        // Evitar nulo/vazio nos principais identificadores e canais de contato
+                        requireNotBlank(cpf, "destinatario.cpf");
+                        requireNotBlank(telefoneWhatsapp, "destinatario.telefone_whatsapp");
+                        requireNotBlank(email, "destinatario.email");
+                }
+        }
 
         @RegisterForReflection
         public record Boleto(
@@ -94,13 +117,31 @@ public record BoletoNotificacaoMessage(
                 @JsonProperty("pix")
                 Pix pix
 
-        ) {}
+        ) {
+                public Boleto {
+                        requireNotNull(nossoNumero, "boleto.nosso_numero");
+                        requireNotBlank(mesReferente, "boleto.mes_referente");
+                        requireNotBlank(dataVencimento, "boleto.data_vencimento");
+                        requireNotBlank(dataEmissao, "boleto.data_emissao");
+                        requireNotBlank(linhaDigitavel, "boleto.linha_digitavel");
+                        requireNotBlank(linhaDigitavelAtual, "boleto.linha_digitavel_atual");
+                        requireNotBlank(valorBoleto, "boleto.valor_boleto");
+                        requireNotBlank(descricaoSituacaoBoleto, "boleto.descricao_situacao_boleto");
+                        requireNotBlank(linkBoleto, "boleto.link_boleto");
+
+                        requireNotNull(pix, "boleto.pix");
+                }
+        }
 
         @RegisterForReflection
         public record Pix(
                 @JsonProperty("copia_cola")
                 String copiaCola
-        ) {}
+        ) {
+                public Pix {
+                        requireNotBlank(copiaCola, "pix.copia_cola");
+                }
+        }
 
         @RegisterForReflection
         public record Meta(
@@ -119,5 +160,31 @@ public record BoletoNotificacaoMessage(
 
                 @JsonProperty("associacao_apelido")
                 String associacaoApelido
-        ) {}
+        ) {
+                public Meta {
+                        requireNotNull(criadoEm, "meta.criado_em");
+                        requireNotBlank(origemSistema, "meta.origem_sistema");
+                        requireNotBlank(admEmail, "meta.adm_email");
+                        requireNotBlank(associacaoCliente, "meta.associacao_clinte");
+                        requireNotBlank(associacaoApelido, "meta.associacao_apelido");
+                }
+        }
+
+        private static void requireNotNull(Object value, String field) {
+                if (value == null) {
+                        throw new CampoEntradaInvalidoException(field + " não pode ser null");
+                }
+        }
+
+        private static void requireNotBlank(String value, String field) {
+                if (value == null || value.trim().isEmpty()) {
+                        throw new CampoEntradaInvalidoException(field + " não pode ser null/vazio");
+                }
+        }
+
+        private static <T> void requireNotNullAndNotEmpty(Set<T> value, String field) {
+                if (value == null || value.isEmpty()) {
+                        throw new CampoEntradaInvalidoException(field + " não pode ser null/vazio");
+                }
+        }
 }
