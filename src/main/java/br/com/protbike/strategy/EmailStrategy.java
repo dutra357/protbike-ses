@@ -1,5 +1,6 @@
 package br.com.protbike.strategy;
 
+import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
 import br.com.protbike.utils.BoletoEmailFormatter;
@@ -7,6 +8,7 @@ import br.com.protbike.utils.EmailFormatterHTML;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
+import software.amazon.awssdk.services.ses.model.SesException;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.*;
 
@@ -16,9 +18,11 @@ public class EmailStrategy implements NotificacaoStrategy {
 
     private static final Logger LOG = Logger.getLogger(EmailStrategy.class.getName());
     private final SesV2Client sesClient;
+    private final Metricas metricas;
 
-    public EmailStrategy(SesV2Client sesClient) {
+    public EmailStrategy(SesV2Client sesClient, Metricas metricas) {
         this.sesClient = sesClient;
+        this.metricas = metricas;
     }
 
     @Override
@@ -29,22 +33,47 @@ public class EmailStrategy implements NotificacaoStrategy {
     @Override
     public void enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
-        LOG.debugf("Enviando Email para %s via SES", notificacaoMsg.destinatario().email());
+        String email = notificacaoMsg.destinatario().email();
 
-          SendEmailRequest request = SendEmailRequest.builder()
-                .fromEmailAddress(notificacaoMsg.meta().associacaoApelido() + " <" + notificacaoMsg.meta().admEmail() + ">")
-                .replyToAddresses(notificacaoMsg.meta().admEmail())
-                .destination(Destination.builder()
-                        .toAddresses(notificacaoMsg.destinatario().email())
-                        .build())
-                .content(EmailContent.builder()
-                        .simple(messageToHtml(notificacaoMsg))
-                        .build())
-                .build();
+        try {
+            SendEmailRequest request = SendEmailRequest.builder()
+                    .configurationSetName("ses-observabilidade")
+                    .fromEmailAddress(notificacaoMsg.meta().associacaoApelido() + " <" + notificacaoMsg.meta().admEmail() + ">")
+                    .replyToAddresses(notificacaoMsg.meta().admEmail())
+                    .destination(Destination.builder()
+                            .toAddresses(email)
+                            .build())
+                    .content(EmailContent.builder()
+                            .simple(messageToHtml(notificacaoMsg))
+                            .build())
+                    .build();
 
-        SendEmailResponse response = sesClient.sendEmail(request);
+            SendEmailResponse response = sesClient.sendEmail(request);
 
-        LOG.debugf("Email aceito pelo SES para envio. messageId=%s", response.messageId());
+            LOG.infof("SES aceitou envio. protocoloId=%s destinatario=%s SesMessageId=%s processamentoId=s%",
+                    notificacaoMsg.numeroProtocolo(),
+                    email,
+                    response.messageId(),
+                    notificacaoMsg.processamentoId()
+            );
+
+            metricas.enviosSucesso++;
+
+        } catch (SesException e) {
+            metricas.enviosFalha++;
+
+            LOG.errorf(e,
+                    "Falha ao enviar via SES. protocoloId=%s destinatario=%s codigoErroAws=%s processamentoId=s%",
+                    notificacaoMsg.numeroProtocolo(),
+                    email,
+                    e.awsErrorDetails() != null ? e.awsErrorDetails().errorCode() : "desconhecido",
+                    notificacaoMsg.processamentoId()
+            );
+
+            // dependendo da sua estratégia:
+            // throw e;  -> para reprocessar
+            // ou apenas registrar e seguir
+        }
     }
 
 
