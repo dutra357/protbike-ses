@@ -5,10 +5,10 @@ import br.com.protbike.records.BoletoNotificacaoMessage.Boleto;
 import br.com.protbike.records.BoletoNotificacaoMessage.Destinatario;
 import br.com.protbike.records.BoletoNotificacaoMessage.Meta;
 import br.com.protbike.records.BoletoNotificacaoMessage.Pix;
+import br.com.protbike.records.enuns.CanalEntrega;
 
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class BoletoTestHelper {
 
@@ -26,8 +26,8 @@ public class BoletoTestHelper {
         private String processamentoId = "proc-xyz-987";
         private String numeroProtocolo = "20230001";
         private String origemCsv = "importacao_janeiro.csv";
-        private String tipoEvento = "BOLETO_DISPONIVEL";
-        private List<String> canais = Arrays.asList("whatsapp", "email");
+        private String tipoEvento = "FECHAMENTO";
+        private Set<CanalEntrega> canais = new HashSet<>();
         private Destinatario destinatario = createDefaultDestinatario();
         private Boleto boleto = createDefaultBoleto();
         private Meta meta = createDefaultMeta();
@@ -48,8 +48,8 @@ public class BoletoTestHelper {
             return this;
         }
 
-        public BoletoMessageBuilder withCanais(String... canais) {
-            this.canais = Arrays.asList(canais);
+        public BoletoMessageBuilder withCanais(CanalEntrega... canais) {
+            this.canais = EnumSet.copyOf(Arrays.asList(canais));
             return this;
         }
 
@@ -128,7 +128,9 @@ public class BoletoTestHelper {
         return new Meta(
                 Instant.now(),
                 "SISTEMA_LEGADO",
-                "admin@protbike.com.br"
+                "admin@protbike.com.br",
+                "Associação CLIENT",
+                "Associação"
         );
     }
 }

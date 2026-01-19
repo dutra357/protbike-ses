@@ -67,11 +67,6 @@
             <artifactId>quarkus-amazon-sesv2</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>io.quarkiverse.amazonservices</groupId>
-            <artifactId>quarkus-amazon-sqs</artifactId>
-        </dependency>
-
         <!-- Source: https://mvnrepository.com/artifact/io.quarkiverse.amazonservices/quarkus-amazon-ses -->
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>

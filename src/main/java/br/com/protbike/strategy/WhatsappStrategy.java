@@ -1,11 +1,12 @@
 package br.com.protbike.strategy;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
+import br.com.protbike.records.enuns.CanalEntrega;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
 @ApplicationScoped
-public class WhatsappStrategy implements NotificationStrategy {
+public class WhatsappStrategy implements NotificacaoStrategy {
 
 
     private static final Logger LOG = Logger.getLogger(WhatsappStrategy.class);
@@ -16,12 +17,12 @@ public class WhatsappStrategy implements NotificationStrategy {
 
 
     @Override
-    public String getChannelName() {
-        return "whatsapp";
+    public CanalEntrega pegarCanal() {
+        return CanalEntrega.WHATSAPP;
     }
 
     @Override
-    public void send(BoletoNotificacaoMessage message) {
+    public void enviarMensagem(BoletoNotificacaoMessage message) {
         LOG.infof("Enviando WhatsApp para %s (Protocolo: %s)",
                 message.destinatario().telefoneWhatsapp(), message.numeroProtocolo());
 

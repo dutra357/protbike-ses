@@ -2,7 +2,7 @@ package br.com.protbike.input;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.BoletoNotificacaoWrapper;
-import br.com.protbike.service.NotificationProcessor;
+import br.com.protbike.service.ProcessadorNotificacao;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -11,17 +11,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Named;
 import org.jboss.logging.Logger;
 
-@Named("processador-sqs-ses")
+@Named("processador-boletos-ses")
 public class HandlerController implements RequestHandler<SQSEvent, Void> {
 
     private static final Logger LOG = Logger.getLogger(HandlerController.class);
 
     private final ObjectMapper objectMapper;
-    private final NotificationProcessor notificationProcessor;
+    private final ProcessadorNotificacao processador;
 
-    public HandlerController(ObjectMapper objectMapper, NotificationProcessor notificationProcessor) {
+    public HandlerController(ObjectMapper objectMapper, ProcessadorNotificacao processador) {
         this.objectMapper = objectMapper;
-        this.notificationProcessor = notificationProcessor;
+        this.processador = processador;
     }
 
     @Override
@@ -41,10 +41,11 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
                     LOG.infof("Processando lista interna de %d boletos", wrapper.boletos().size());
 
                     for (BoletoNotificacaoMessage boletoNotificacaoMessage : wrapper.boletos()) {
-                        notificationProcessor.processMessage(boletoNotificacaoMessage);
+                        processador.processarEntrega(boletoNotificacaoMessage);
                     }
+
                 } else {
-                    LOG.warn("Mensagem recebida com lista de boletos vazia ou nula.");
+                    LOG.warn("Mensagem com lista de boletos vazia ou nula. Ausente parse JSON.");
                 }
 
             } catch (Exception e) {

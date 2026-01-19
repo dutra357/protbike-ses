@@ -1,54 +1,68 @@
 package br.com.protbike.strategy;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
-import br.com.protbike.records.EmailJob;
+import br.com.protbike.records.enuns.CanalEntrega;
+import br.com.protbike.utils.BoletoEmailFormatter;
+import br.com.protbike.utils.EmailFormatterHTML;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
-import software.amazon.awssdk.services.ses.SesClient;
-import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 
+import software.amazon.awssdk.services.sesv2.SesV2Client;
+import software.amazon.awssdk.services.sesv2.model.*;
 
-import static br.com.protbike.utils.BoletoEmailFormatter.formatarAssunto;
-import static br.com.protbike.utils.BoletoEmailFormatter.formatarCorpoEmail;
 
 @ApplicationScoped
-public class EmailStrategy implements NotificationStrategy {
+public class EmailStrategy implements NotificacaoStrategy {
 
     private static final Logger LOG = Logger.getLogger(EmailStrategy.class.getName());
+    private final SesV2Client sesClient;
 
-
-    private final SesClient sesClient;
-
-    public EmailStrategy(SesClient sesClient) {
+    public EmailStrategy(SesV2Client sesClient) {
         this.sesClient = sesClient;
     }
 
     @Override
-    public String getChannelName() {
-        return "EMAIL";
+    public CanalEntrega pegarCanal() {
+        return CanalEntrega.EMAIL;
     }
 
     @Override
-    public void send(BoletoNotificacaoMessage boletoNotificacaoMessage) {
+    public void enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
-        LOG.infof("Enviando Email para %s via SES", boletoNotificacaoMessage.destinatario().email());
+        LOG.infof("Enviando Email para %s via SES", notificacaoMsg.destinatario().email());
 
-        String assunto = formatarAssunto(boletoNotificacaoMessage);
-        String corpoEmail = formatarCorpoEmail(boletoNotificacaoMessage);
+          SendEmailRequest request = SendEmailRequest.builder()
+                .fromEmailAddress(notificacaoMsg.meta().associacaoApelido() + " <" + notificacaoMsg.meta().admEmail() + ">")
+                .replyToAddresses(notificacaoMsg.meta().admEmail())
+                .destination(Destination.builder()
+                        .toAddresses(notificacaoMsg.destinatario().email())
+                        .build())
+                .content(EmailContent.builder()
+                        .simple(messageToHtml(notificacaoMsg))
+                        .build())
+                .build();
 
-        EmailJob email = new EmailJob(
-                boletoNotificacaoMessage.destinatario().email(),
-                "contato@protbike.com.br",
-                assunto,
-                "",
-                corpoEmail
-        );
-
-        sesClient.sendEmail(SendEmailRequest.builder()
-                .source("contato@protbike.com.br")
-                .destination(d -> d.toAddresses(boletoNotificacaoMessage.destinatario().email()))
-                .message(email)
-                .build());
-
+        SendEmailResponse response = sesClient.sendEmail(request);
+        LOG.infof("Email enviado via SES. messageId=%s", response.messageId());
     }
+
+
+    private Message messageToHtml(BoletoNotificacaoMessage msg) {
+
+        String subject = "PROTBIKE | Boleto disponível - " + msg.boleto().mesReferente();
+        String htmlBody = EmailFormatterHTML.toHtml(msg);
+        String textBody = BoletoEmailFormatter.formatarCorpoEmail(msg);
+
+        return Message.builder()
+                .subject(Content.builder()
+                        .data(subject)
+                        .charset("UTF-8")
+                        .build())
+                .body(Body.builder()
+                        .html(Content.builder().data(htmlBody).charset("UTF-8").build())
+                        .text(Content.builder().data(textBody).charset("UTF-8").build())
+                        .build())
+                .build();
+    }
+
 }

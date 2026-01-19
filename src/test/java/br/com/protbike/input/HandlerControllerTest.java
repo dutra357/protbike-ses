@@ -1,7 +1,7 @@
 package br.com.protbike.input;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
-import br.com.protbike.service.NotificationProcessor;
+import br.com.protbike.service.ProcessadorNotificacao;
 
 import br.com.protbike.utils.SQSEventFactory;
 import io.quarkus.test.InjectMock;
@@ -24,7 +24,7 @@ class HandlerControllerTest {
 
     // Mocka para a lógica de negócio
     @InjectMock
-    NotificationProcessor processorMock;
+    ProcessadorNotificacao processorMock;
 
     String jsonPayload = """
         {
@@ -60,7 +60,7 @@ class HandlerControllerTest {
         // 3. Verifica se o Parse funcionou e chamou o processador 2 vezes (pois há 2 boletos no JSON)
         ArgumentCaptor<BoletoNotificacaoMessage> captor = ArgumentCaptor.forClass(BoletoNotificacaoMessage.class);
 
-        verify(processorMock, times(2)).processMessage(captor.capture());
+        verify(processorMock, times(2)).processarEntrega(captor.capture());
 
         // 4. Valida se os dados chegaram íntegros dentro do método
         var boletosCapturados = captor.getAllValues();

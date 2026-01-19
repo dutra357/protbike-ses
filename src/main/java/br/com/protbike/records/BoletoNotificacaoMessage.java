@@ -1,10 +1,12 @@
 package br.com.protbike.records;
 
+import br.com.protbike.records.enuns.CanalEntrega;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
+
 import java.time.Instant;
-import java.util.List;
+import java.util.Set;
 
 @RegisterForReflection
 public record BoletoNotificacaoMessage(
@@ -21,18 +23,23 @@ public record BoletoNotificacaoMessage(
         @JsonProperty("origem_csv")
         String origemCsv,
 
+        // Tipo do evento (ex: BOLETO_FECHAMENTO)
         @JsonProperty("tipo_evento")
         String tipoEvento,
 
+        // Set de canais de entrega (ex: ["WHATSAPP"])
         @JsonProperty("canais")
-        List<String> canais,
+        Set<CanalEntrega> canais,
 
+        // Para quem será enviada a mensagem
         @JsonProperty("destinatario")
         Destinatario destinatario,
 
+        // Dados estruturados do boleto
         @JsonProperty("boleto")
         Boleto boleto,
 
+        // Metadados para auditoria e rastreabilidade
         @JsonProperty("meta")
         Meta meta
 
@@ -105,7 +112,12 @@ public record BoletoNotificacaoMessage(
                 String origemSistema,
 
                 @JsonProperty("adm_email")
-                String admEmail
+                String admEmail,
 
+                @JsonProperty("associacao_clinte")
+                String associacaoCliente,
+
+                @JsonProperty("associacao_apelido")
+                String associacaoApelido
         ) {}
 }
