@@ -11,15 +11,19 @@ public class Metricas {
     public int enviosSucesso;
     public int enviosFalha;
 
-    public int boletosSucesso;
-    public int boletosFalha;
+    public void reset() {
+        mensagensSqsTotal = 0;
+        boletosTotal = 0;
+        enviosSucesso = 0;
+        enviosFalha = 0;
+    }
 
 
     @Override
     public String toString() {
         return String.format(
-                "boletosTotal=%d, boletosSucesso=%d, boletosFalha=%d, enviosSucesso=%d, enviosFalha=%d",
-                boletosTotal, boletosSucesso, boletosFalha, enviosSucesso, enviosFalha
+                "boletosTotal=%d, enviosSucesso=%d, enviosFalha=%d",
+                boletosTotal, enviosSucesso, enviosFalha
         );
     }
 }

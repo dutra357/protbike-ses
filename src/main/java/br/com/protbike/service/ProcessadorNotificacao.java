@@ -1,5 +1,7 @@
 package br.com.protbike.service;
 
+import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
+import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.exceptions.StrategyInvalidaException;
 import br.com.protbike.records.BoletoNotificacaoMessage;
@@ -9,7 +11,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import static io.quarkus.arc.ComponentsProvider.LOG;
@@ -37,52 +41,37 @@ public class ProcessadorNotificacao {
                 );
             }
         }
-
         this.strategies = Map.copyOf(map);
     }
 
-    public void processarEntrega(BoletoNotificacaoMessage boletoMessage) {
+    public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage) {
+
+        List<ResultadoEnvio> resultados = new ArrayList<>();
 
         for (CanalEntrega canal : boletoMessage.canais()) {
             NotificacaoStrategy strategy = strategies.get(canal);
 
-            if (boletoMessage.canais() == null || boletoMessage.canais().isEmpty()) {
-                metricas.boletosFalha++;
-                LOG.warnf(
-                        "Mensagem/boleto sem canais tenantId=%s protocoloId=%s processamentoId=s%",
-                        boletoMessage.tenantId(),
-                        boletoMessage.numeroProtocolo(),
-                        boletoMessage.processamentoId()
-                );
-                return;
-            }
-
             if (strategy == null) {
-                LOG.warnf(
-                        "Canal sem strategy tenantId=%s protocoloId=%s canal=%s processamentoId=s%",
-                        boletoMessage.tenantId(),
-                        boletoMessage.numeroProtocolo(),
-                        canal,
-                        boletoMessage.processamentoId()
+                metricas.enviosFalha++;
+                resultados.add(
+                        new EnvioFalhaNaoRetryavel(
+                                boletoMessage.numeroProtocolo(),
+                                "Canal sem strategy (null): " + canal
+                        )
                 );
 
+                LOG.warnf(
+                        "Mensagem/boleto sem canais (null) tenantId=%s protocoloId=%s processamentoId=s%",
+                        boletoMessage.tenantId(),
+                        boletoMessage.numeroProtocolo(),
+                        boletoMessage.processamentoId()
+                );
                 continue;
             }
 
-            try {
-                strategy.enviarMensagem(boletoMessage);
-                metricas.boletosSucesso++;
-
-            } catch (Exception e) {
-                metricas.boletosFalha++;
-                LOG.errorf(e,
-                        "Falha no envio: canal=%s protocoloId=%s tenantId=%s processamentoId=s%",
-                        canal,
-                        boletoMessage.numeroProtocolo(),
-                        boletoMessage.tenantId(),
-                        boletoMessage.processamentoId()
-                );
-            }
+            ResultadoEnvio resultado = strategy.enviarMensagem(boletoMessage);
+            resultados.add(resultado);
         }
+        return resultados;
     }
 }

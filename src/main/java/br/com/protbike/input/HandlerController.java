@@ -1,5 +1,7 @@
 package br.com.protbike.input;
 
+import br.com.protbike.config.DlqPublisher;
+import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.BoletoNotificacaoWrapper;
@@ -14,6 +16,9 @@ import io.quarkus.arc.ManagedContext;
 import jakarta.inject.Named;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Named("processador-boletos-ses")
 public class HandlerController implements RequestHandler<SQSEvent, Void> {
 
@@ -22,14 +27,16 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
     private final ObjectMapper objectMapper;
     private final ProcessadorNotificacao processador;
     private final Metricas metricas;
+    private final DlqPublisher dlqPublisher;
 
-//    private final EmfLogger emfLogger;
-
-
-    public HandlerController(ObjectMapper objectMapper, ProcessadorNotificacao processador, Metricas metricas) {
+    public HandlerController(ObjectMapper objectMapper,
+                             ProcessadorNotificacao processador,
+                             Metricas metricas,
+                             DlqPublisher dlqPublisher) {
         this.objectMapper = objectMapper;
         this.processador = processador;
         this.metricas = metricas;
+        this.dlqPublisher = dlqPublisher;
     }
 
     @Override
@@ -37,65 +44,89 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
 
         ManagedContext requestContext = Arc.container().requestContext();
         requestContext.activate();
+        metricas.reset();
 
-        for (SQSMessage sqsMessage : event.getRecords()) {
-            metricas.mensagensSqsTotal++;
+        try {
+            for (SQSMessage sqsMessage : event.getRecords()) {
+                metricas.mensagensSqsTotal++;
+                List<BoletoNotificacaoMessage> paraDlq = new ArrayList<>();
 
-            try {
-                BoletoNotificacaoWrapper wrapper = objectMapper.readValue(
-                        sqsMessage.getBody(),
-                        BoletoNotificacaoWrapper.class
-                );
+                try {
+                    BoletoNotificacaoWrapper wrapper = objectMapper.readValue(
+                            sqsMessage.getBody(),
+                            BoletoNotificacaoWrapper.class
+                    );
 
-                // Validação
-                if (wrapper.boletos() != null && !wrapper.boletos().isEmpty()) {
+                    if (wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
+                        LOG.warnf("Mensagem SQS vazia. sqsId=%s awsRequestId=%s",
+                                sqsMessage.getMessageId(),
+                                context.getAwsRequestId());
+                        continue;
+                    }
 
                     String tenantId = wrapper.boletos().get(0).tenantId();
                     String processamentoId = wrapper.boletos().get(0).processamentoId();
 
                     LOG.infof(
-                            "[INICIO] Processando batch. tenantID=%s processamentoID=%s boletos=%d AwsRequestId=%s",
+                            "evento=inicio_processamento tenant=%s processamento=%s boletos=%d awsRequestId=%s sqsId=%s",
                             tenantId,
                             processamentoId,
                             wrapper.boletos().size(),
-                            context.getAwsRequestId()
+                            context.getAwsRequestId(),
+                            sqsMessage.getMessageId()
                     );
 
-                    for (BoletoNotificacaoMessage boletoNotificacaoMessage : wrapper.boletos()) {
-                        processador.processarEntrega(boletoNotificacaoMessage);
+                    for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
+                        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto);
+
+                        for (ResultadoEnvio resultado : resultados) {
+                            if (resultado.sucesso()) {
+                                metricas.enviosSucesso++;
+                            }
+                            else if (resultado.retryavel()) {
+                                throw new RuntimeException("Erro retryável: " + resultado.motivo());
+                            }
+                            else {
+                                metricas.enviosFalha++;
+                                paraDlq.add(boleto);
+                            }
+                        }
+
                         metricas.boletosTotal++;
                     }
 
-                } else {
-                    LOG.warnf("Mensagem com lista de boletos vazia ou nula. Ausente parse JSON. ContextoLambdaID={}",
-                            context.getAwsRequestId());
+                    if (!paraDlq.isEmpty()) {
+                        try {
+                            dlqPublisher.enviar(paraDlq);
+                        } catch (Exception e) {
+                            throw new RuntimeException("Falha ao publicar na DLQ", e);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    LOG.errorf(e,
+                            "evento=erro_lote sqsId=%s awsRequestId=%s",
+                            sqsMessage.getMessageId(),
+                            context.getAwsRequestId()
+                    );
+
+                    // ESSENCIAL: faz o SQS reenfileirar
+                    throw e;
                 }
 
-            } catch (Exception e) {
-                LOG.error("ERRO processando do lote. SqsID: " + sqsMessage.getMessageId(), e);
-
-            } finally {
-                requestContext.terminate();
+                LOG.infof(
+                        "[FIM] Lote: boletosTotal=%d enviosSucesso=%d enviosFalha=%d sqsId=%s awsRequestId=%s",
+                        metricas.boletosTotal,
+                        metricas.enviosSucesso,
+                        metricas.enviosFalha,
+                        sqsMessage.getMessageId(),
+                        context.getAwsRequestId()
+                );
             }
 
-            LOG.infof(
-                    "[FIM] Execução concluída. totalBoletos=%d sucesso=%d falha=%d enviosOk=%d enviosFalha=%d",
-                    metricas.boletosTotal,
-                    metricas.boletosSucesso,
-                    metricas.boletosFalha,
-                    metricas.enviosSucesso,
-                    metricas.enviosFalha
-            );
-
-//            emfLogger.logMetricas(Map.of(
-//                    "boletos_total", metricas.boletosTotal,
-//                    "boletos_sucesso", metricas.boletosSucesso,
-//                    "boletos_falha", metricas.boletosFalha,
-//                    "envios_sucesso", metricas.enviosSucesso,
-//                    "envios_falha", metricas.enviosFalha
-//            ));
+        } finally {
+            requestContext.terminate();
         }
-
         return null;
     }
 }

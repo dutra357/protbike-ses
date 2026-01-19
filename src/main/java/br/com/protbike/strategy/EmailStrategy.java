@@ -1,6 +1,9 @@
 package br.com.protbike.strategy;
 
-import br.com.protbike.config.EmailFaultToleranceConfig;
+import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
+import br.com.protbike.exceptions.taxonomy.EnvioFalhaRetryavel;
+import br.com.protbike.exceptions.taxonomy.EnvioSucesso;
+import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
@@ -44,7 +47,7 @@ public class EmailStrategy implements NotificacaoStrategy {
             delay = 10_000
     )
     @RateLimit(value = 1, window = 2)
-    public void enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
+    public ResultadoEnvio enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
         String email = notificacaoMsg.destinatario().email();
 
@@ -74,9 +77,30 @@ public class EmailStrategy implements NotificacaoStrategy {
             );
 
             metricas.enviosSucesso++;
+            return new EnvioSucesso(notificacaoMsg.numeroProtocolo());
+
+        } catch (ThrottlingException | TimeoutException e) {
+            // Retry faz sentido
+            return new EnvioFalhaRetryavel(
+                    notificacaoMsg.numeroProtocolo(),
+                    "Falha transitória SES: " + e.getMessage()
+            );
+
+        } catch (MessageRejectedException e) {
+            // Email inválido, nunca vai funcionar
+            metricas.enviosFalha++;
+            return new EnvioFalhaNaoRetryavel(
+                    notificacaoMsg.numeroProtocolo(),
+                    "Email rejeitado: " + e.getMessage()
+            );
 
         } catch (SesException e) {
+            // Segurança: assume retryável
             metricas.enviosFalha++;
+            return new EnvioFalhaRetryavel(
+                    notificacaoMsg.numeroProtocolo(),
+                    "Erro inesperado: " + e.getClass().getSimpleName()
+            );
 
             LOG.errorf(e,
                     "Erro SES. protocolo=%s destinatario=%s awsCode=%s",
