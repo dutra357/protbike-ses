@@ -1,6 +1,5 @@
 package br.com.protbike.input;
 
-import br.com.protbike.metrics.EmfLogger;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.BoletoNotificacaoWrapper;

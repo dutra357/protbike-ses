@@ -1,11 +1,16 @@
 package br.com.protbike.strategy;
 
+import br.com.protbike.config.EmailFaultToleranceConfig;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
 import br.com.protbike.utils.BoletoEmailFormatter;
 import br.com.protbike.utils.EmailFormatterHTML;
+import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Retry;
+import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 
 import software.amazon.awssdk.services.ses.model.SesException;
@@ -31,6 +36,14 @@ public class EmailStrategy implements NotificacaoStrategy {
     }
 
     @Override
+    @Retry(maxRetries = 3, delay = 300)
+    @Timeout(3000)
+    @CircuitBreaker(
+            requestVolumeThreshold = 10,
+            failureRatio = 0.5,
+            delay = 10_000
+    )
+    @RateLimit(value = 1, window = 2)
     public void enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
         String email = notificacaoMsg.destinatario().email();
@@ -38,7 +51,10 @@ public class EmailStrategy implements NotificacaoStrategy {
         try {
             SendEmailRequest request = SendEmailRequest.builder()
                     .configurationSetName("ses-observabilidade")
-                    .fromEmailAddress(notificacaoMsg.meta().associacaoApelido() + " <" + notificacaoMsg.meta().admEmail() + ">")
+                    .fromEmailAddress(
+                            notificacaoMsg.meta().associacaoApelido() +
+                                    " <" + notificacaoMsg.meta().admEmail() + ">"
+                    )
                     .replyToAddresses(notificacaoMsg.meta().admEmail())
                     .destination(Destination.builder()
                             .toAddresses(email)
@@ -50,11 +66,11 @@ public class EmailStrategy implements NotificacaoStrategy {
 
             SendEmailResponse response = sesClient.sendEmail(request);
 
-            LOG.infof("SES aceitou envio. protocoloId=%s destinatario=%s SesMessageId=%s processamentoId=s%",
+            LOG.debugf(
+                    "SES aceitou envio. protocolo=%s destinatario=%s sesMessageId=%s",
                     notificacaoMsg.numeroProtocolo(),
                     email,
-                    response.messageId(),
-                    notificacaoMsg.processamentoId()
+                    response.messageId()
             );
 
             metricas.enviosSucesso++;
@@ -63,19 +79,17 @@ public class EmailStrategy implements NotificacaoStrategy {
             metricas.enviosFalha++;
 
             LOG.errorf(e,
-                    "Falha ao enviar via SES. protocoloId=%s destinatario=%s codigoErroAws=%s processamentoId=s%",
+                    "Erro SES. protocolo=%s destinatario=%s awsCode=%s",
                     notificacaoMsg.numeroProtocolo(),
                     email,
-                    e.awsErrorDetails() != null ? e.awsErrorDetails().errorCode() : "desconhecido",
-                    notificacaoMsg.processamentoId()
+                    e.awsErrorDetails() != null
+                            ? e.awsErrorDetails().errorCode()
+                            : "desconhecido"
             );
 
-            // dependendo da sua estratégia:
-            // throw e;  -> para reprocessar
-            // ou apenas registrar e seguir
+            throw e; // importante! permite retry/circuit breaker funcionar
         }
     }
-
 
     private Message messageToHtml(BoletoNotificacaoMessage msg) {
 

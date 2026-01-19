@@ -138,8 +138,7 @@ public class EmailFormatterHTML {
                 .append("Esta é uma mensagem automática, e não precisa ser respondida.")
                 .append("</p>")
                 .append("<p style=\"margin:0;font-size:12px;line-height:18px;color:#667085;\">")
-                .append("Para qualquer divergência, responda a este e-mail informando o protocolo <strong>")
-                .append(esc(protocolo)).append("</strong>.")
+                .append("Ocorrendo qualquer divergência nos procure pelos nossos canais de atendimento.")
                 .append("</p>")
                 .append("</div>")
 
