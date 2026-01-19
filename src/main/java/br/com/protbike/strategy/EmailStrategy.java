@@ -44,7 +44,7 @@ public class EmailStrategy implements NotificacaoStrategy {
 
         SendEmailResponse response = sesClient.sendEmail(request);
 
-        LOG.debugf("Email enviado via SES. messageId=%s", response.messageId());
+        LOG.debugf("Email aceito pelo SES para envio. messageId=%s", response.messageId());
     }
 
 
