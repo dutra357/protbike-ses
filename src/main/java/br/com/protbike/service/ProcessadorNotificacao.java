@@ -52,8 +52,7 @@ public class ProcessadorNotificacao {
             NotificacaoStrategy strategy = strategies.get(canal);
 
             if (strategy == null) {
-                metricas.enviosFalha++;
-                resultados.add(
+               resultados.add(
                         new EnvioFalhaNaoRetryavel(
                                 boletoMessage.numeroProtocolo(),
                                 "Canal sem strategy (null): " + canal

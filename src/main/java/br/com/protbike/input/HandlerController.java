@@ -8,6 +8,7 @@ import br.com.protbike.records.BoletoNotificacaoWrapper;
 import br.com.protbike.service.ProcessadorNotificacao;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Named("processador-boletos-ses")
-public class HandlerController implements RequestHandler<SQSEvent, Void> {
+public class HandlerController implements RequestHandler<SQSEvent, SQSBatchResponse> {
 
     private static final Logger LOG = Logger.getLogger(HandlerController.class);
 
@@ -40,93 +41,90 @@ public class HandlerController implements RequestHandler<SQSEvent, Void> {
     }
 
     @Override
-    public Void handleRequest(SQSEvent event, Context context) {
+    public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
 
         ManagedContext requestContext = Arc.container().requestContext();
         requestContext.activate();
-        metricas.reset();
+
+        // Lista para o SQS saber quais mensagens do lote (envelope) falharam totalmente
+        List<SQSBatchResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
 
         try {
             for (SQSMessage sqsMessage : event.getRecords()) {
-                metricas.mensagensSqsTotal++;
-                List<BoletoNotificacaoMessage> paraDlq = new ArrayList<>();
-
                 try {
-                    BoletoNotificacaoWrapper wrapper = objectMapper.readValue(
-                            sqsMessage.getBody(),
-                            BoletoNotificacaoWrapper.class
-                    );
-
-                    if (wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
-                        LOG.warnf("Mensagem SQS vazia. sqsId=%s awsRequestId=%s",
-                                sqsMessage.getMessageId(),
-                                context.getAwsRequestId());
-                        continue;
-                    }
-
-                    String tenantId = wrapper.boletos().get(0).tenantId();
-                    String processamentoId = wrapper.boletos().get(0).processamentoId();
-
-                    LOG.infof(
-                            "evento=inicio_processamento tenant=%s processamento=%s boletos=%d awsRequestId=%s sqsId=%s",
-                            tenantId,
-                            processamentoId,
-                            wrapper.boletos().size(),
-                            context.getAwsRequestId(),
-                            sqsMessage.getMessageId()
-                    );
-
-                    for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
-                        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto);
-
-                        for (ResultadoEnvio resultado : resultados) {
-                            if (resultado.sucesso()) {
-                                metricas.enviosSucesso++;
-                            }
-                            else if (resultado.retryavel()) {
-                                throw new RuntimeException("Erro retryável: " + resultado.motivo());
-                            }
-                            else {
-                                metricas.enviosFalha++;
-                                paraDlq.add(boleto);
-                            }
-                        }
-
-                        metricas.boletosTotal++;
-                    }
-
-                    if (!paraDlq.isEmpty()) {
-                        try {
-                            dlqPublisher.enviar(paraDlq);
-                        } catch (Exception e) {
-                            throw new RuntimeException("Falha ao publicar na DLQ", e);
-                        }
-                    }
+                    processarMensagemSqs(sqsMessage, context);
 
                 } catch (Exception e) {
-                    LOG.errorf(e,
-                            "evento=erro_lote sqsId=%s awsRequestId=%s",
-                            sqsMessage.getMessageId(),
-                            context.getAwsRequestId()
-                    );
-
-                    // ESSENCIAL: faz o SQS reenfileirar
-                    throw e;
+                    LOG.errorf(e, "Erro fatal no processamento da mensagem SQS %s", sqsMessage.getMessageId());
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(sqsMessage.getMessageId()));
                 }
-
-                LOG.infof(
-                        "[FIM] Lote: boletosTotal=%d enviosSucesso=%d enviosFalha=%d sqsId=%s awsRequestId=%s",
-                        metricas.boletosTotal,
-                        metricas.enviosSucesso,
-                        metricas.enviosFalha,
-                        sqsMessage.getMessageId(),
-                        context.getAwsRequestId()
-                );
             }
-
         } finally {
             requestContext.terminate();
         }
-        return null;
+        return new SQSBatchResponse(batchItemFailures);
+    }
+
+    private void processarMensagemSqs(SQSMessage sqsMessage, Context context) throws Exception {
+        metricas.reset();
+
+        BoletoNotificacaoWrapper wrapper = objectMapper.readValue(
+                sqsMessage.getBody(),
+                BoletoNotificacaoWrapper.class
+        );
+
+        if (wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
+            return;
+        }
+
+        List<BoletoNotificacaoMessage> falhasParaDlq = new ArrayList<>();
+
+        for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
+            try {
+                boolean sucessoBoleto = executarEntregaBoleto(boleto);
+
+                if (!sucessoBoleto) {
+                    falhasParaDlq.add(boleto);
+                }
+
+            } catch (Exception e) {
+                LOG.errorf(e, "Erro inesperado no boleto %s, enviando para lista de falhas", boleto.numeroProtocolo());
+                falhasParaDlq.add(boleto);
+            }
+        }
+
+        if (!falhasParaDlq.isEmpty()) {
+            try {
+                dlqPublisher.enviar(falhasParaDlq);
+                LOG.warnf("Lote processado com %d falhas enviadas para DLQ. sqsId=%s",
+                        falhasParaDlq.size(), sqsMessage.getMessageId());
+
+            } catch (Exception e) {
+                // Se falhar o envio para a DLQ, lançamos exceção para o SQS não apagar a mensagem original
+                throw new RuntimeException("Falha crítica ao publicar na DLQ", e);
+            }
+        }
+    }
+
+    private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto) {
+        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto);
+
+        boolean tudoSucesso = true;
+
+        for (ResultadoEnvio resultado : resultados) {
+            if (resultado.sucesso()) {
+                metricas.enviosSucesso++;
+
+            } else if (resultado.retryavel()) {
+                // Se for algo temporário (ex: API do SES fora), lançamos exceção
+                // Isso fará a MENSAGEM SQS INTEIRA voltar para a fila.
+                throw new RuntimeException("Erro temporário (Retry): " + resultado.motivo());
+            } else {
+                metricas.enviosFalha++;
+                tudoSucesso = false;
+            }
+        }
+        metricas.boletosTotal++;
+        return tudoSucesso;
     }
 }
