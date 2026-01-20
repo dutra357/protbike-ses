@@ -10,7 +10,7 @@ import java.util.Locale;
 
 public class EmailFormatterHTML {
 
-    private static final Locale LOCALE_BR = new Locale("pt", "BR");
+    private static final Locale LOCALE_BR = Locale.forLanguageTag("pt-BR");
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -147,6 +147,7 @@ public class EmailFormatterHTML {
                 .append("<div style=\"font-weight:700;\">Atenciosamente,</div>")
                 .append("<div>Equipe ")
                 .append(esc(msg.meta().associacaoApelido())).append("</div>");
+
 
         if (!contato.isBlank()) {
             html.append("<div style=\"margin-top:6px;font-size:13px;color:#344054;\">")
