@@ -1,9 +1,11 @@
 package br.com.protbike.config;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 
+@ApplicationScoped
 public class DlqPublisher {
 
     private String connection;

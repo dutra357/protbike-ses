@@ -8,13 +8,13 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-public class EmailFormatterHTML {
+public class FormatarEmailV1 {
 
     private static final Locale LOCALE_BR = Locale.forLanguageTag("pt-BR");
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    EmailFormatterHTML() {}
+    FormatarEmailV1() {}
 
     public static String toHtml(BoletoNotificacaoMessage msg) {
 
@@ -235,4 +235,3 @@ public class EmailFormatterHTML {
         return esc(s).replace("\n", "").replace("\r", "");
     }
 }
-
