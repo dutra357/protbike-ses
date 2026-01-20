@@ -7,6 +7,7 @@ import br.com.protbike.exceptions.StrategyInvalidaException;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
 import br.com.protbike.strategy.NotificacaoStrategy;
+import com.amazonaws.services.lambda.runtime.Context;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -44,7 +45,7 @@ public class ProcessadorNotificacao {
         this.strategies = Map.copyOf(map);
     }
 
-    public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage) {
+    public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage, Context context) {
 
         List<ResultadoEnvio> resultados = new ArrayList<>();
 
@@ -52,24 +53,30 @@ public class ProcessadorNotificacao {
             NotificacaoStrategy strategy = strategies.get(canal);
 
             if (strategy == null) {
-               resultados.add(
-                        new EnvioFalhaNaoRetryavel(
-                                boletoMessage.numeroProtocolo(),
-                                "Canal sem strategy (null): " + canal
-                        )
-                );
 
-                LOG.warnf(
-                        "Mensagem/boleto sem canais (null) tenantId=%s protocoloId=%s processamentoId=s%",
-                        boletoMessage.tenantId(),
+                resultados.add(new EnvioFalhaNaoRetryavel(
                         boletoMessage.numeroProtocolo(),
-                        boletoMessage.processamentoId()
-                );
+                        "Canal nulo, impossível o envio. "
+                ));
+
+                LOG.errorf("Configuração inconsistente: canal %s solicitado mas não implementado. Protocolo: %s",
+                        canal, boletoMessage.numeroProtocolo());
                 continue;
             }
 
-            ResultadoEnvio resultado = strategy.enviarMensagem(boletoMessage);
-            resultados.add(resultado);
+            try {
+                ResultadoEnvio resultado = strategy.enviarMensagem(boletoMessage);
+                resultados.add(resultado);
+
+            } catch (Exception e) {
+                // Proteção contra exceções não tratadas dentro da Strategy
+                LOG.errorf(e, "Erro inesperado na strategy %s para o protocolo %s",
+                        canal, boletoMessage.numeroProtocolo());
+                resultados.add(new EnvioFalhaNaoRetryavel(
+                        boletoMessage.numeroProtocolo(),
+                        "Erro interno na strategy: " + e.getMessage()
+                ));
+            }
         }
         return resultados;
     }

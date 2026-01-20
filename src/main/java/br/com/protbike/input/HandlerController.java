@@ -81,7 +81,7 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
 
         for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
             try {
-                boolean sucessoBoleto = executarEntregaBoleto(boleto);
+                boolean sucessoBoleto = executarEntregaBoleto(boleto ,context);
 
                 if (!sucessoBoleto) {
                     falhasParaDlq.add(boleto);
@@ -106,8 +106,8 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
         }
     }
 
-    private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto) {
-        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto);
+    private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto, Context context) {
+        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto, context);
 
         boolean tudoSucesso = true;
 
