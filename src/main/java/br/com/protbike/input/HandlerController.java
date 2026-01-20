@@ -1,7 +1,7 @@
 package br.com.protbike.input;
 
 import br.com.protbike.config.DlqPublisher;
-import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
+import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.BoletoNotificacaoWrapper;
@@ -16,6 +16,7 @@ import io.quarkus.arc.Arc;
 import io.quarkus.arc.ManagedContext;
 import jakarta.inject.Named;
 import org.jboss.logging.Logger;
+import org.jboss.logging.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,30 +43,35 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
 
     @Override
     public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
-
         ManagedContext requestContext = Arc.container().requestContext();
         requestContext.activate();
 
-        // Lista para o SQS saber quais mensagens do lote (envelope) falharam totalmente
         List<SQSBatchResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
 
         try {
             for (SQSMessage sqsMessage : event.getRecords()) {
+                // NÍVEL 1 MDC: Contexto de Infraestrutura (Seguro para qualquer erro)
+                MDC.clear();
+                MDC.put("aws_request_id", context.getAwsRequestId());
+                MDC.put("sqs_message_id", sqsMessage.getMessageId());
+
                 try {
-                    processarMensagemSqs(sqsMessage, context);
+                    processarMensagemSqs(sqsMessage);
 
                 } catch (Exception e) {
-                    LOG.errorf(e, "Erro fatal no processamento da mensagem SQS %s", sqsMessage.getMessageId());
+                    // LOG sai com aws_request_id e sqs_message_id garantidos
+                    LOG.errorf(e, "Erro fatal no processamento da mensagem SQS");
                     batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(sqsMessage.getMessageId()));
                 }
             }
         } finally {
+            MDC.clear();
             requestContext.terminate();
         }
         return new SQSBatchResponse(batchItemFailures);
     }
 
-    private void processarMensagemSqs(SQSMessage sqsMessage, Context context) throws Exception {
+    private void processarMensagemSqs(SQSMessage sqsMessage) throws Exception {
         metricas.reset();
 
         BoletoNotificacaoWrapper wrapper = objectMapper.readValue(
@@ -74,40 +80,57 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
         );
 
         if (wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
+            LOG.warn("Recebido wrapper vazio ou sem boletos");
             return;
         }
 
+        // NÍVEL 2 MDC: Contexto de Negócio (Lote)
+        String tenantId = wrapper.boletos().get(0).tenantId();
+        String processamentoId = wrapper.boletos().get(0).processamentoId();
+
+        MDC.put("tenant_id", tenantId);
+        MDC.put("processamento_id", processamentoId);
+
         List<BoletoNotificacaoMessage> falhasParaDlq = new ArrayList<>();
 
+        // Processamento Item a Item
         for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
             try {
-                boolean sucessoBoleto = executarEntregaBoleto(boleto ,context);
+                // NÍVEL 3: Contexto do Item
+                MDC.put("protocolo_bol", boleto.numeroProtocolo());
+
+                boolean sucessoBoleto = executarEntregaBoleto(boleto);
 
                 if (!sucessoBoleto) {
                     falhasParaDlq.add(boleto);
                 }
 
             } catch (Exception e) {
-                LOG.errorf(e, "Erro inesperado no boleto %s, enviando para lista de falhas", boleto.numeroProtocolo());
+                LOG.errorf(e, "Erro inesperado ao processar boleto");
                 falhasParaDlq.add(boleto);
+            } finally {
+                // CRÍTICO: Remover o protocolo ao fim do loop.
+                // Assim, o próximo boleto não herda protocolo errado e
+                // os logs fora do loop (DLQ) não ficam com protocolo "fantasma".
+                MDC.remove("protocolo_bol");
             }
         }
 
+        // Aqui o MDC ainda tem tenant_id e processamento_id, mas NÃO tem protocolo.
         if (!falhasParaDlq.isEmpty()) {
             try {
                 dlqPublisher.enviar(falhasParaDlq);
-                LOG.warnf("Lote processado com %d falhas enviadas para DLQ. sqsId=%s",
-                        falhasParaDlq.size(), sqsMessage.getMessageId());
-
+                LOG.warnf("Lote concluído com falhas parciais. total_falhas=%d", falhasParaDlq.size());
             } catch (Exception e) {
-                // Se falhar o envio para a DLQ, lançamos exceção para o SQS não apagar a mensagem original
                 throw new RuntimeException("Falha crítica ao publicar na DLQ", e);
             }
+        } else {
+            LOG.infof("Lote processado com sucesso total. qtd_boletos=%d", wrapper.boletos().size());
         }
     }
 
-    private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto, Context context) {
-        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto, context);
+    private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto) {
+        List<ResultadoEnvio> resultados = processador.processarEntrega(boleto);
 
         boolean tudoSucesso = true;
 

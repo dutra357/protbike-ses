@@ -1,9 +1,10 @@
 package br.com.protbike.strategy;
 
 import br.com.protbike.exceptions.taxonomy.EnvioSucesso;
-import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
+import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
+import br.com.protbike.strategy.contract.NotificacaoStrategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 

@@ -1,13 +1,12 @@
 package br.com.protbike.service;
 
 import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
-import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
+import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.exceptions.StrategyInvalidaException;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
-import br.com.protbike.strategy.NotificacaoStrategy;
-import com.amazonaws.services.lambda.runtime.Context;
+import br.com.protbike.strategy.contract.NotificacaoStrategy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -45,7 +44,7 @@ public class ProcessadorNotificacao {
         this.strategies = Map.copyOf(map);
     }
 
-    public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage, Context context) {
+    public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage) {
 
         List<ResultadoEnvio> resultados = new ArrayList<>();
 

@@ -55,7 +55,7 @@ public class EmailFormatterHTML {
                 .append("<head>")
                 .append("<meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-                .append("<title>").append(esc(msg.numeroProtocolo())).append("</title>")
+                .append("<title>").append(esc(msg.meta().associacaoCliente())).append("</title>")
                 .append("</head>")
                 .append("<body style=\"margin:0;padding:0;background:#F6F7F9;font-family:Arial,Helvetica,sans-serif;color:#101828;\">")
 
@@ -66,7 +66,7 @@ public class EmailFormatterHTML {
 
                 // header
                 .append("<tr><td style=\"padding:20px 24px;border-bottom:1px solid #EAECF0;\">")
-                .append("<div style=\"font-size:18px;font-weight:700;\">ProtBike</div>")
+                .append("<div style=\"font-size:18px;font-weight:700;\">").append(esc(msg.meta().associacaoCliente())).append("</div>")
                 .append("<div style=\"font-size:13px;color:#667085;margin-top:4px;\">E-mail transacional — remessa de boleto</div>")
                 .append("</td></tr>")
 
@@ -91,15 +91,13 @@ public class EmailFormatterHTML {
 
                 .append(row("Protocolo", protocolo))
                 .append(row("Nosso número", nossoNumero))
-                .append(row("Referência", referencia.isBlank() ? "N/D" : referencia))
-                .append(row("Emissão", emissao))
+                .append(row("Competência", referencia.isBlank() ? "N/D" : referencia))
+                .append(row("Data de emissão", emissao))
                 .append(row("Vencimento", venc))
                 .append(row("Valor", valor))
-                .append("</table>")
+                .append("</table>");
 
         // boleto link CTA
-        ;
-
         if (!link.isBlank()) {
             html.append("<div style=\"margin-top:16px;\">")
                     .append("<a href=\"").append(escAttr(link)).append("\" ")
@@ -138,7 +136,7 @@ public class EmailFormatterHTML {
                 .append("Esta é uma mensagem automática, e não precisa ser respondida.")
                 .append("</p>")
                 .append("<p style=\"margin:0;font-size:12px;line-height:18px;color:#667085;\">")
-                .append("Ocorrendo qualquer divergência nos procure pelos nossos canais de atendimento.")
+                .append("Ocorrendo qualquer divergência nos procure em nossos canais de atendimento.")
                 .append("</p>")
                 .append("</div>")
 
@@ -146,7 +144,7 @@ public class EmailFormatterHTML {
                 .append("<div style=\"margin-top:16px;font-size:14px;line-height:20px;\">")
                 .append("<div style=\"font-weight:700;\">Atenciosamente,</div>")
                 .append("<div>Equipe ")
-                .append(esc(msg.meta().associacaoApelido())).append("</div>");
+                .append(esc(msg.meta().associacaoApelido().toUpperCase())).append("</div>");
 
 
         if (!contato.isBlank()) {

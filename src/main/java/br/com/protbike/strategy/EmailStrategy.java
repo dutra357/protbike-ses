@@ -2,11 +2,13 @@ package br.com.protbike.strategy;
 
 import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
 import br.com.protbike.exceptions.taxonomy.EnvioSucesso;
-import br.com.protbike.exceptions.taxonomy.ResultadoEnvio;
+import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
+import br.com.protbike.strategy.contract.NotificacaoStrategy;
 import br.com.protbike.utils.BoletoEmailFormatter;
 import br.com.protbike.utils.EmailFormatterHTML;
+import io.smallrye.common.annotation.RunOnVirtualThread;
 import io.smallrye.faulttolerance.api.RateLimit;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
@@ -14,19 +16,20 @@ import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.jboss.logging.Logger;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
+import software.amazon.awssdk.services.sesv2.SesV2AsyncClient;
 import software.amazon.awssdk.services.sesv2.model.TooManyRequestsException;
 import software.amazon.awssdk.services.ses.model.SesException;
-import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.*;
+
+import java.util.concurrent.CompletionException;
 
 @ApplicationScoped
 public class EmailStrategy implements NotificacaoStrategy {
 
     private static final Logger LOG = Logger.getLogger(EmailStrategy.class);
-    private final SesV2Client sesClient;
+    private final SesV2AsyncClient sesClient;
 
-    // Métricas removidas do construtor, pois quem conta agora é o Handler
-    public EmailStrategy(SesV2Client sesClient) {
+    public EmailStrategy(SesV2AsyncClient sesClient) {
         this.sesClient = sesClient;
     }
 
@@ -44,6 +47,7 @@ public class EmailStrategy implements NotificacaoStrategy {
             delay = 10_000
     )
     @RateLimit(value = 1, window = 2) // SES Sandbox padrão é 1/s, Prod é 14/s+
+    @RunOnVirtualThread
     public ResultadoEnvio enviarMensagem(BoletoNotificacaoMessage notificacaoMsg) {
 
         String email = notificacaoMsg.destinatario().email();
@@ -64,7 +68,7 @@ public class EmailStrategy implements NotificacaoStrategy {
                             .build())
                     .build();
 
-            SendEmailResponse response = sesClient.sendEmail(request);
+            SendEmailResponse response = enviarEmailComUnwrap(request);
 
             LOG.debugf(
                     "SES aceitou envio. protocolo=%s destinatario=%s sesMessageId=%s",
@@ -111,16 +115,32 @@ public class EmailStrategy implements NotificacaoStrategy {
     }
 
     private Message messageToHtml(BoletoNotificacaoMessage msg) {
+
         String subject = msg.meta().associacaoApelido().toUpperCase() + " | Boleto disponível - " + msg.boleto().mesReferente();
         String htmlBody = EmailFormatterHTML.toHtml(msg);
-        String textBody = BoletoEmailFormatter.formatarCorpoEmail(msg);
 
         return Message.builder()
                 .subject(Content.builder().data(subject).charset("UTF-8").build())
                 .body(Body.builder()
                         .html(Content.builder().data(htmlBody).charset("UTF-8").build())
-                        .text(Content.builder().data(textBody).charset("UTF-8").build())
                         .build())
                 .build();
+    }
+
+    private SendEmailResponse enviarEmailComUnwrap(SendEmailRequest request) {
+        try {
+            // O .join() bloqueia a Virtual Thread esperando o CRT (Nativo)
+            return sesClient.sendEmail(request).join();
+        } catch (CompletionException e) {
+            // Causa real
+            Throwable cause = e.getCause();
+
+            // Se a causa for uma RuntimeException (todas do AWS SDK são), relançamos ela
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            // Se for outra coisa, relançamos o erro original
+            throw e;
+        }
     }
 }

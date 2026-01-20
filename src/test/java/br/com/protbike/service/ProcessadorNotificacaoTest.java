@@ -2,7 +2,7 @@ package br.com.protbike.service;
 
 import br.com.protbike.exceptions.StrategyInvalidaException;
 import br.com.protbike.records.enuns.CanalEntrega;
-import br.com.protbike.strategy.NotificacaoStrategy;
+import br.com.protbike.strategy.contract.NotificacaoStrategy;
 import br.com.protbike.utils.BoletoTestHelper;
 import jakarta.enterprise.inject.Instance;
 import org.junit.jupiter.api.BeforeEach;

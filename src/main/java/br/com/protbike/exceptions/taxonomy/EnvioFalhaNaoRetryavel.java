@@ -1,5 +1,7 @@
 package br.com.protbike.exceptions.taxonomy;
 
+import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
+
 public class EnvioFalhaNaoRetryavel implements ResultadoEnvio {
 
     private final String protocolo;

@@ -44,11 +44,6 @@
         
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
         </dependency>
 
@@ -56,6 +51,7 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-amazon-lambda</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-events</artifactId>
@@ -69,6 +65,13 @@
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>
             <artifactId>quarkus-amazon-sesv2</artifactId>
+            <version>3.13.0</version>
+        </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/io.quarkus/quarkus-logging-json -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-logging-json</artifactId>
         </dependency>
 
         <!-- Source: https://mvnrepository.com/artifact/io.quarkiverse.amazonservices/quarkus-amazon-ses -->
@@ -87,17 +90,9 @@
             <scope>compile</scope>
         </dependency>
 
-        <!-- Source: https://mvnrepository.com/artifact/io.quarkus/quarkus-rest-client-jackson -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson</artifactId>
-            <version>3.30.6</version>
-            <scope>compile</scope>
-        </dependency>
-
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
-            <artifactId>url-connection-client</artifactId>
+            <artifactId>aws-crt-client</artifactId>
         </dependency>
 
         <dependency>
