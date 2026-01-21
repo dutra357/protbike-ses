@@ -7,7 +7,8 @@ import java.util.List;
 @RegisterForReflection
 public record BoletoNotificacaoWrapper(
 
+        @JsonProperty("lote_id")
+        String loteProcessamentoId,
         @JsonProperty("boletos")
         List<BoletoNotificacaoMessage> boletos
-
 ) {}

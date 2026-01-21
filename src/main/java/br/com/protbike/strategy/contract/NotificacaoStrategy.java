@@ -4,10 +4,12 @@ import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
 
+import java.util.concurrent.CompletableFuture;
+
 public interface NotificacaoStrategy {
 
     CanalEntrega pegarCanal();
 
-    ResultadoEnvio enviarMensagem(BoletoNotificacaoMessage message);
+    CompletableFuture<ResultadoEnvio> enviarMensagem(BoletoNotificacaoMessage message);
 
 }

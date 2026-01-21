@@ -20,6 +20,7 @@ import org.jboss.logging.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Named("processador-boletos-ses")
 public class HandlerController implements RequestHandler<SQSEvent, SQSBatchResponse> {
@@ -50,7 +51,6 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
 
         try {
             for (SQSMessage sqsMessage : event.getRecords()) {
-                // NÍVEL 1 MDC: Contexto de Infraestrutura (Seguro para qualquer erro)
                 MDC.clear();
                 MDC.put("aws_request_id", context.getAwsRequestId());
                 MDC.put("sqs_message_id", sqsMessage.getMessageId());
@@ -59,8 +59,8 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
                     processarMensagemSqs(sqsMessage);
 
                 } catch (Exception e) {
-                    // LOG sai com aws_request_id e sqs_message_id garantidos
-                    LOG.errorf(e, "Erro fatal no processamento da mensagem SQS");
+                    LOG.errorf(e, "Erro fatal no processamento da mensagem SQS. Lote não processado.");
+                    // Reporta falha individual para o SQS (Partial Batch Response)
                     batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(sqsMessage.getMessageId()));
                 }
             }
@@ -79,25 +79,20 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
                 BoletoNotificacaoWrapper.class
         );
 
-        if (wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
-            LOG.warn("Recebido wrapper vazio ou sem boletos");
+        // PROTEÇÃO CONTRA NPE: Verificação rigorosa do wrapper
+        if (wrapper == null || wrapper.boletos() == null || wrapper.boletos().isEmpty()) {
+            LOG.warn("Lote recebido vazio ou inválido.");
             return;
         }
 
-        // NÍVEL 2 MDC: Contexto de Negócio (Lote)
-        String tenantId = wrapper.boletos().get(0).tenantId();
-        String processamentoId = wrapper.boletos().get(0).processamentoId();
-
-        MDC.put("tenant_id", tenantId);
-        MDC.put("processamento_id", processamentoId);
+        // NÍVEL 2 MDC: Contexto de Negócio com Proteção contra Null
+        configurarMdcNegocio(wrapper);
 
         List<BoletoNotificacaoMessage> falhasParaDlq = new ArrayList<>();
 
-        // Processamento Item a Item
         for (BoletoNotificacaoMessage boleto : wrapper.boletos()) {
             try {
-                // NÍVEL 3: Contexto do Item
-                MDC.put("protocolo_bol", boleto.numeroProtocolo());
+                MDC.put("protocolo_bol", Optional.ofNullable(boleto.numeroProtocolo()).orElse("N/A"));
 
                 boolean sucessoBoleto = executarEntregaBoleto(boleto);
 
@@ -106,27 +101,28 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
                 }
 
             } catch (Exception e) {
-                LOG.errorf(e, "Erro inesperado ao processar boleto");
+                LOG.errorf(e, "Erro inesperado ao processar boleto unitário.");
                 falhasParaDlq.add(boleto);
             } finally {
-                // CRÍTICO: Remover o protocolo ao fim do loop.
-                // Assim, o próximo boleto não herda protocolo errado e
-                // os logs fora do loop (DLQ) não ficam com protocolo "fantasma".
                 MDC.remove("protocolo_bol");
             }
         }
 
-        // Aqui o MDC ainda tem tenant_id e processamento_id, mas NÃO tem protocolo.
         if (!falhasParaDlq.isEmpty()) {
-            try {
-                dlqPublisher.enviar(falhasParaDlq);
-                LOG.warnf("Lote concluído com falhas parciais. total_falhas=%d", falhasParaDlq.size());
-            } catch (Exception e) {
-                throw new RuntimeException("Falha crítica ao publicar na DLQ", e);
-            }
+            dlqPublisher.enviar(falhasParaDlq);
+            LOG.warnf("Lote concluído com %d falhas enviadas para DLQ customizada.", falhasParaDlq.size());
         } else {
-            LOG.infof("Lote processado com sucesso total. qtd_boletos=%d", wrapper.boletos().size());
+            LOG.infof("Lote processado com sucesso total. qtd=%d", wrapper.boletos().size());
         }
+    }
+
+    private void configurarMdcNegocio(BoletoNotificacaoWrapper wrapper) {
+        BoletoNotificacaoMessage ref = wrapper.boletos().get(0);
+        Optional.ofNullable(ref.meta().tenantId()).ifPresent(v -> MDC.put("tenant_id", v));
+        Optional.ofNullable(ref.meta().csvProcessamentoId()).ifPresent(v -> MDC.put("csv_processamento_id", v));
+        Optional.ofNullable(wrapper.loteProcessamentoId()).ifPresent(v -> MDC.put("lote_id", v));
+        Optional.ofNullable(ref.meta().associacaoApelido()).ifPresent(v -> MDC.put("associacao_apelido", v));
+        Optional.ofNullable(ref.meta().origemCsv()).ifPresent(v -> MDC.put("origem_csv", v));
     }
 
     private boolean executarEntregaBoleto(BoletoNotificacaoMessage boleto) {
@@ -137,11 +133,9 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
         for (ResultadoEnvio resultado : resultados) {
             if (resultado.sucesso()) {
                 metricas.enviosSucesso++;
-
             } else if (resultado.retryavel()) {
-                // Se for algo temporário (ex: API do SES fora), lançamos exceção
-                // Isso fará a MENSAGEM SQS INTEIRA voltar para a fila.
-                throw new RuntimeException("Erro temporário (Retry): " + resultado.motivo());
+                // Se um dos canais for retryável (ex: SES fora), lançamos para o SQS reprocessar o lote
+                throw new RuntimeException("Erro temporário SES (Retry): " + resultado.motivo());
             } else {
                 metricas.enviosFalha++;
                 tudoSucesso = false;

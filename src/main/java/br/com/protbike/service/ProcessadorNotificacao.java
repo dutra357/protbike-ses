@@ -2,7 +2,6 @@ package br.com.protbike.service;
 
 import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
 import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
-import br.com.protbike.metrics.Metricas;
 import br.com.protbike.exceptions.StrategyInvalidaException;
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import br.com.protbike.records.enuns.CanalEntrega;
@@ -15,6 +14,8 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static io.quarkus.arc.ComponentsProvider.LOG;
 
@@ -22,18 +23,13 @@ import static io.quarkus.arc.ComponentsProvider.LOG;
 public class ProcessadorNotificacao {
 
     private final Map<CanalEntrega, NotificacaoStrategy> strategies;
-    private final Metricas metricas;
 
     @Inject
-    public ProcessadorNotificacao(Instance<NotificacaoStrategy> strategyInstances, Metricas metricas) {
-        this.metricas = metricas;
+    public ProcessadorNotificacao(Instance<NotificacaoStrategy> strategyInstances) {
         EnumMap<CanalEntrega, NotificacaoStrategy> map = new EnumMap<>(CanalEntrega.class);
-
         for (NotificacaoStrategy strategy : strategyInstances) {
-
             CanalEntrega key = strategy.pegarCanal();
             NotificacaoStrategy previous = map.putIfAbsent(key, strategy);
-
             if (previous != null) {
                 throw new StrategyInvalidaException(
                         "Estratégia duplicada para canal " + key + ": " +
@@ -46,37 +42,44 @@ public class ProcessadorNotificacao {
 
     public List<ResultadoEnvio> processarEntrega(BoletoNotificacaoMessage boletoMessage) {
 
-        List<ResultadoEnvio> resultados = new ArrayList<>();
+        List<CompletableFuture<ResultadoEnvio>> futures = new ArrayList<>();
 
         for (CanalEntrega canal : boletoMessage.canais()) {
             NotificacaoStrategy strategy = strategies.get(canal);
 
             if (strategy == null) {
-
-                resultados.add(new EnvioFalhaNaoRetryavel(
-                        boletoMessage.numeroProtocolo(),
-                        "Canal nulo, impossível o envio. "
-                ));
-
                 LOG.errorf("Configuração inconsistente: canal %s solicitado mas não implementado. Protocolo: %s",
                         canal, boletoMessage.numeroProtocolo());
+
+                // Como não há strategy, cria um future já completado com falha
+                futures.add(CompletableFuture.completedFuture(
+                        new EnvioFalhaNaoRetryavel(boletoMessage.numeroProtocolo(), "Canal não implementado: " + canal)
+                ));
                 continue;
             }
 
-            try {
-                ResultadoEnvio resultado = strategy.enviarMensagem(boletoMessage);
-                resultados.add(resultado);
+            // Disparar o envio assíncrono
+            CompletableFuture<ResultadoEnvio> future = strategy.enviarMensagem(boletoMessage)
+                    .exceptionally(e -> {
+                        // Captura erros fora da escada de catch da strategy
+                        LOG.errorf(e, "Erro fatal não tratado na strategy %s para o protocolo %s",
+                                canal, boletoMessage.numeroProtocolo());
 
-            } catch (Exception e) {
-                // Proteção contra exceções não tratadas dentro da Strategy
-                LOG.errorf(e, "Erro inesperado na strategy %s para o protocolo %s",
-                        canal, boletoMessage.numeroProtocolo());
-                resultados.add(new EnvioFalhaNaoRetryavel(
-                        boletoMessage.numeroProtocolo(),
-                        "Erro interno na strategy: " + e.getMessage()
-                ));
-            }
+                        return new EnvioFalhaNaoRetryavel(
+                                boletoMessage.numeroProtocolo(),
+                                "Erro interno inesperado: " + e.getMessage()
+                        );
+                    });
+
+            futures.add(future);
         }
-        return resultados;
+
+        // Aguardar todas as estratégias terminarem em paralelo
+        // allOf cria um future que completa quando todos os envios terminarem
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> futures.stream()
+                        .map(CompletableFuture::join)
+                        .collect(Collectors.toList()))
+                .join();
     }
 }
