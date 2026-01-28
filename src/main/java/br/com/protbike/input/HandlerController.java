@@ -44,6 +44,7 @@ public class HandlerController implements RequestHandler<SQSEvent, SQSBatchRespo
 
     @Override
     public SQSBatchResponse handleRequest(SQSEvent event, Context context) {
+
         ManagedContext requestContext = Arc.container().requestContext();
         requestContext.activate();
 

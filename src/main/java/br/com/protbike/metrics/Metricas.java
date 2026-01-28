@@ -18,7 +18,6 @@ public class Metricas {
         enviosFalha = 0;
     }
 
-
     @Override
     public String toString() {
         return String.format(

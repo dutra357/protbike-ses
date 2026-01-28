@@ -6,7 +6,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum CanalEntrega {
     WHATSAPP("whatsapp"),
     EMAIL("email"),
-    SMS("sms");
+    SMS("sms"),
+    SEM_CANAL("sem-canal");
 
     private final String codigo;
 
@@ -21,7 +22,7 @@ public enum CanalEntrega {
 
     @JsonCreator
     public static CanalEntrega fromJson(String value) {
-        return CanalEntrega.fromString(value); // reaproveita sua lógica
+        return CanalEntrega.fromString(value);
     }
 
     public static CanalEntrega fromString(String value) {

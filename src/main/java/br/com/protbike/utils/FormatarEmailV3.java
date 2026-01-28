@@ -16,7 +16,7 @@ public class FormatarEmailV3 {
     // Para segurança total em outros ambientes, use ThreadLocal ou instancie localmente.
     private static final NumberFormat CURRENCY_FORMAT = NumberFormat.getCurrencyInstance(LOCALE_BR);
 
-    public static String toHtml(BoletoNotificacaoMessage msg) {
+    public static String toHtml(BoletoNotificacaoMessage msg, String unsubscribeUrl) {
         if (msg == null) return "";
 
         final var destinatario = msg.destinatario();
@@ -121,20 +121,52 @@ public class FormatarEmailV3 {
         }
 
         // Footer e Assinatura
-        html.append("<div style=\"margin-top:20px;padding-top:16px;border-top:1px solid #EAECF0;\">")
-                .append("<p style=\"margin:0 0 8px 0;font-size:12px;line-height:18px;color:#667085;\">Esta é uma mensagem automática, e não precisa ser respondida.</p></div>")
-                .append("<p style=\"margin:0 0 8px 0;font-size:12px;line-height:18px;color:#667085;\">Dúvidas? Acesse nossos canais de atendimento.</p></div>")
-                .append("<div style=\"margin-top:16px;font-size:14px;line-height:20px;\"><div style=\"font-weight:700;\">Atenciosamente,</div>")
-                .append("<div>Equipe ").append(esc(meta.associacaoApelido().toUpperCase())).append("</div>");
+        html.append("<div style=\"margin-top:20px;padding-top:16px;border-top:1px solid #EAECF0;text-align:center;font-family:Arial, sans-serif;\">")
+                .append("<p style=\"margin:0 0 4px 0;font-size:12px;line-height:18px;color:#667085;\">Esta é uma mensagem automática e não deve ser respondida.</p>")
+                .append("<p style=\"margin:0 0 16px 0;font-size:12px;line-height:18px;color:#667085;\">Dúvidas? Acesse nossos canais de atendimento.</p>")
+
+                // Assinatura
+                .append("<div style=\"margin-bottom:20px;font-size:14px;line-height:20px;color:#101828;\">")
+                .append("<div style=\"font-weight:700;\">Atenciosamente,</div>")
+                .append("<div style=\"margin-top:2px;\">Equipe ").append(esc(meta.associacaoApelido().toUpperCase())).append("</div>");
 
         if (!contato.isEmpty()) {
-            html.append("<div style=\"margin-top:6px;font-size:13px;\"><a href=\"mailto:").append(escAttr(contato))
-                    .append("\" style=\"color:#1D4ED8;text-decoration:none;\">").append(esc(contato)).append("</a></div>");
+            html.append("<div style=\"margin-top:6px;font-size:13px;\">")
+                    .append("<a href=\"mailto:").append(escAttr(contato))
+                    .append("\" style=\"color:#1D4ED8;text-decoration:none;font-weight:500;\">").append(esc(contato)).append("</a></div>");
         }
+        html.append("</div>") // Fecha bloco de assinatura
 
-        html.append("</div></td></tr><tr><td style=\"padding:14px 24px;background:#FCFCFD;border-top:1px solid #EAECF0;\">")
-                .append("<div style=\"font-size:11px;color:#667085;line-height:16px;\">Protocolo: ").append(esc(protocolo))
-                .append(" • Processamento: ").append(esc(safe(msg.meta().csvProcessamentoId()))).append("</div></td></tr>")
+                // Bloco de Descadastramento (CAN-SPAM Compliance)
+                .append("<div style=\"margin:20px 0;padding:12px;background-color:#F9FAFB;border-radius:8px;\">")
+                .append("<p style=\"margin:0;font-size:11px;line-height:16px;color:#667085;\">")
+                .append("Respeitamos sua privacidade. Se não deseja mais receber estes boletos por e-mail, ")
+                .append("<a href=\"").append(escAttr(unsubscribeUrl))
+                .append("\" style=\"color:#1D4ED8;text-decoration:underline;font-weight:500;\">clique aqui para cancelar o envio eletrônico</a>.")
+                .append("</p></div>")
+
+                // Informações Corporativas e Legais
+                .append("<address style=\"font-style:normal;font-size:11px;line-height:18px;color:#98A2B3;\">")
+                .append("<span style=\"font-weight:700;color:#667085;\">").append(esc(meta.associacaoCliente().toUpperCase())).append("</span><br>")
+                .append("CNPJ: 47.788.341/0001-37<br>")
+                .append("Rua Antonio Schroeder, 960, sala 2, Bela Vista — São José, SC — CEP 88.110-401<br>")
+
+                // Links Institucionais
+                .append("<div style=\"margin-top:8px;\">")
+                .append("<a href=\"https://www.protbike.com.br\" style=\"color:#98A2B3;text-decoration:none;\">www.protbike.com.br</a>")
+                .append("  •  ")
+                .append("<a href=\"https://www.protbike.com.br/privacidade\" style=\"color:#98A2B3;text-decoration:none;\">Política de Privacidade</a>")
+                .append("</div>")
+                .append("</address>")
+                .append("</div>"); // Fecha o container principal do footer
+
+// Rodapé Técnico (Protocolo)
+        html.append("</td></tr>")
+                .append("<tr><td style=\"padding:16px 24px;background:#FCFCFD;border-top:1px solid #EAECF0;text-align:center;\">")
+                .append("<div style=\"font-size:10px;color:#98A2B3;line-height:14px;text-transform:uppercase;letter-spacing:0.8px;\">")
+                .append("ID de Segurança: ").append(esc(protocolo))
+                .append("  |  Ref: ").append(esc(safe(msg.meta().csvProcessamentoId())))
+                .append("</div></td></tr>")
                 .append("</table></td></tr></table></body></html>");
 
         return html.toString();
@@ -148,23 +180,23 @@ public class FormatarEmailV3 {
                 .append("</td></tr>");
     }
 
-    private static String safe(String s) {
+    protected static String safe(String s) {
         return (s == null) ? "" : s.trim();
     }
 
-    private static String firstNonBlank(String a, String b) {
+    protected static String firstNonBlank(String a, String b) {
         if (a != null && !a.trim().isEmpty()) return a.trim();
         return (b != null) ? b.trim() : "";
     }
 
-    private static String formatDateBr(String isoDate) {
+    protected static String formatDateBr(String isoDate) {
         if (isoDate == null || isoDate.isBlank()) return "N/D";
         try {
             return LocalDate.parse(isoDate, ISO).format(BR);
         } catch (Exception e) { return isoDate; }
     }
 
-    private static String formatMoneyBr(String value) {
+    protected static String formatMoneyBr(String value) {
         if (value == null || value.isBlank()) return "N/D";
         try {
             return CURRENCY_FORMAT.format(new BigDecimal(value.trim()));
