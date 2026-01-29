@@ -1,6 +1,6 @@
 package br.com.protbike.input;
 
-import br.com.protbike.config.DlqPublisher;
+import br.com.protbike.service.DlqPublisher;
 import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;
 import br.com.protbike.metrics.Metricas;
 import br.com.protbike.records.BoletoNotificacaoMessage;

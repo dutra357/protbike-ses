@@ -1,7 +1,7 @@
 //package br.com.protbike.input;
 //
 //import br.com.protbike.utils.BoletoNotificacaoMessageBuilder;
-//import br.com.protbike.config.DlqPublisher;
+//import br.com.protbike.service.DlqPublisher;
 //import br.com.protbike.exceptions.taxonomy.EnvioFalhaNaoRetryavel;
 //import br.com.protbike.exceptions.taxonomy.EnvioSucesso;
 //import br.com.protbike.exceptions.taxonomy.contract.ResultadoEnvio;

@@ -1,4 +1,4 @@
-package br.com.protbike.config;
+package br.com.protbike.service;
 
 import br.com.protbike.records.BoletoNotificacaoMessage;
 import jakarta.enterprise.context.ApplicationScoped;

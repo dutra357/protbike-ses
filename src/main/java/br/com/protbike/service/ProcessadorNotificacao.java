@@ -79,7 +79,7 @@ public class ProcessadorNotificacao {
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                 .thenApply(v -> futures.stream()
                         .map(CompletableFuture::join)
-                        .collect(Collectors.toList()))
+                        .toList())
                 .join();
     }
 }
